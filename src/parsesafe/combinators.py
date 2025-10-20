@@ -88,6 +88,8 @@ class Combinator(t.Generic[_In, _Out, _Err]):
 
     def map(self, function: t.Callable[[_Out], _Out2]) -> Combinator[_In, _Out2, _Err | ErrProduction]:
         return outmap(self, function)
+    def ucmap(self, function: t.Callable[[_Out], _Out2]) -> Combinator[_In, _Out2, _Err]:
+        return unchecked_outmap(self, function)
     def produce(self, production: _Out2) -> Combinator[_In, _Out2, _Err]:
         return produce(self, production)
     
@@ -120,6 +122,15 @@ class Combinator(t.Generic[_In, _Out, _Err]):
     
     def append(self: Combinator[_In, tuple[*_TOut], _Err], other: Combinator[_In, _Out2, _Err2]) -> Combinator[_In, tuple[*_TOut, _Out2], _Err | _Err2]:
         return append(self, other)
+    
+    def car(self: Combinator[_In, tuple[_Car, *_Cdr], _Err]) -> Combinator[_In, _Car, _Err]:
+        return car(self)
+    def cdr(self: Combinator[_In, tuple[_Car, *_Cdr], _Err]) -> Combinator[_In, tuple[*_Cdr], _Err]:
+        return cdr(self)
+    def last(self: Combinator[_In, tuple[*_Init, _Last], _Err]) -> Combinator[_In, _Last, _Err]:
+        return last(self)
+    def init(self: Combinator[_In, tuple[*_Init, _Last], _Err]) -> Combinator[_In, tuple[*_Init], _Err]:
+        return init(self)
         
     def filter(self, *options: _Out):
         return outfilter(self, *options)
@@ -369,17 +380,18 @@ def append(first: Combinator[_In, tuple[*_TOut], _Err], second: Combinator[_In, 
     object.__setattr__(comb, "_is_construct", True)
     return comb
 
-def car(combinator: Combinator[_In, tuple[_Car, *_Cdr], _Err]) -> Combinator[_In, _Car, _Err | ErrProduction]:
-    comb = outmap(combinator, lambda c: c[0])
+
+def car(combinator: Combinator[_In, tuple[_Car, *_Cdr], _Err]) -> Combinator[_In, _Car, _Err]:
+    comb = unchecked_outmap(combinator, lambda c: c[0])
     return comb
-def cdr(combinator: Combinator[_In, tuple[_Car, *_Cdr], _Err]) -> Combinator[_In, tuple[*_Cdr], _Err | ErrProduction]:
-    comb = outmap(combinator, lambda c: c[1:])
+def cdr(combinator: Combinator[_In, tuple[_Car, *_Cdr], _Err]) -> Combinator[_In, tuple[*_Cdr], _Err]:
+    comb = unchecked_outmap(combinator, lambda c: c[1:])
     object.__setattr__(comb, "_is_construct", True)
     return comb
-def last(combinator: Combinator[_In, tuple[*_Init, _Last], _Err]) -> Combinator[_In, _Last, _Err | ErrProduction]:
-    return outmap(combinator, lambda c: c[-1])
-def init(combinator: Combinator[_In, tuple[*_Init, _Last], _Err]) -> Combinator[_In, tuple[*_Init], _Err | ErrProduction]:
-    comb = outmap(combinator, lambda c: c[:-1])
+def last(combinator: Combinator[_In, tuple[*_Init, _Last], _Err]) -> Combinator[_In, _Last, _Err]:
+    return unchecked_outmap(combinator, lambda c: c[-1])
+def init(combinator: Combinator[_In, tuple[*_Init, _Last], _Err]) -> Combinator[_In, tuple[*_Init], _Err]:
+    comb = unchecked_outmap(combinator, lambda c: c[:-1])
     object.__setattr__(comb, "_is_construct", True)
     return comb
 
@@ -395,15 +407,22 @@ def outfilter(com: Combinator[_In, _Out, _Err], *options: _Out) -> Combinator[_I
     
     
 def outmap(com: Combinator[_In, _Out, _Err], function: t.Callable[[_Out], _Out2]) -> Combinator[_In, _Out2, _Err | ErrProduction]:
+    unckeded_comb = unchecked_outmap(com, function)
+    @combinator(com.name)
+    def comb(seq: Advancer[_In]):
+        try:
+            return unckeded_comb(seq)
+        except RuntimeError:
+            return ErrProduction(Span(seq.pos, seq.pos))
+    return comb
+
+def unchecked_outmap(com: Combinator[_In, _Out, _Err], function: t.Callable[[_Out], _Out2]) -> Combinator[_In, _Out2, _Err]:
     @combinator(com.name)
     def comb(seq: Advancer[_In]):
         res = com(seq)
         if iserr(res):
             return res
-        try:
-            obj = function(res[1])
-        except RuntimeError:
-            return ErrProduction(Span(seq.pos, res[0].pos))
+        obj = function(res[1])
         return res[0], obj
     return comb
 

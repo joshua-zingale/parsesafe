@@ -10,7 +10,6 @@ def test_string():
     assert c.string("yghuijfs324").parse("yghuijfs324") == "yghuijfs324"
     assert iserr(c.string("bob").parse("bob bob"))
 
-
 def test_regex():
     assert c.regex(r"\w+ \d.\d\d").parse("abcdefg 3.14") == "abcdefg 3.14"
     assert c.regex(r"\w\d").parse("a1") == "a1"
@@ -26,6 +25,7 @@ def test_postignore():
     assert iserr(c.regex(r"d.\d\d").parse("3.14    "))
     assert c.regex(r"\d.\d\d").postignore(c.regex(r"\s+")).parse("3.14   ") == "3.14"
     assert c.regex(r"\w\d").postignore(c.string("\n")).parse("a1\n") == "a1"
+    
 def test_preignore():
     assert iserr(c.regex(r"d.\d\d").parse("    3.14"))
     assert c.regex(r"\d.\d\d").preignore(c.regex(r"\s+")).parse("     3.14") == "3.14"
@@ -88,6 +88,34 @@ def test_and():
     comb = c.regex(r"\d+").map(int) & c.regex(r"[a-g]+") & c.regex(r"True|False").map(lambda x: x == "True")
     assert comb.parse("123dadgadTrue") == (123, "dadgad", True)
     assert comb.parse("123dadgadFalse") == (123, "dadgad", False)
+
+
+def test_times():
+    comb = c.string("abc").times()
+
+    assert comb.parse("") == []
+    assert comb.parse("abc") == ["abc"]
+    assert comb.parse("abcabc") == ["abc", "abc"]
+    assert comb.parse("abcabcabc") == ["abc", "abc", "abc"]
+    assert comb.parse("abcabcabcabc") == ["abc", "abc", "abc", "abc"]
+
+    comb = c.string("abc").times(1, 3)
+
+    assert iserr(comb.parse(""))
+    assert comb.parse("abc") == ["abc"]
+    assert comb.parse("abcabc") == ["abc", "abc"]
+    assert comb.parse("abcabcabc") == ["abc", "abc", "abc"]
+    assert iserr(comb.parse("abcabcabcabc"))
+    assert iserr(comb.parse("abcabcabcabcabc"))
+
+def test_car_cdr_init_last():
+    comb = c.regex(r"\d+\s*").ucmap(int) & c.regex(r"\w+\s*").ucmap(str.strip) & c.regex(r"true|false").ucmap(lambda x: x == "true")
+
+    assert comb.parse("123 hehe false") == (123, "hehe", False)
+    assert comb.car().parse("123 hehe false") == 123
+    assert comb.cdr().parse("123 hehe false") == ("hehe", False)
+    assert comb.last().parse("123 hehe false") == False
+    assert comb.init().parse("123 hehe false") == (123, "hehe")
 
 def test_build():
     @dataclass
