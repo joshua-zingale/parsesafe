@@ -1,8 +1,9 @@
 from dataclasses import dataclass
-from parsesafe import combinators as c
-from parsesafe.err import iserr
-from parsesafe.advancer import Advancer
 import operator as op
+
+from parsesafe import combinators as c
+from parsesafe.err import iserr, Err
+from parsesafe.advancer import Advancer
 
 def test_string():
     assert c.string("bob").parse("bob") == "bob"
@@ -49,7 +50,7 @@ def test_as_token_with_postignore_first():
 
 def test_seq():
     @c.combinator
-    def number(seq: Advancer[int]):
+    def number(seq: Advancer[int]) -> c.CombinatorResult[int, int, Err]:
         return seq.advance(1), seq[0]
     
     assert number.parse([1]) == 1
@@ -104,9 +105,9 @@ def test_build():
 
 def test_expression():
     space = c.regex(r"\s*")
-    expr = c.forward(str, float, "Expression")
-    term = c.forward(str, float, "Term")
-    fac = c.forward(str, float, "Factor")
+    expr = c.forward(str, float, Err, "Expression")
+    term = c.forward(str, float, Err, "Term")
+    fac = c.forward(str, float, Err, "Factor")
     num = c.regex(r"(\d*\.)?\d+").map(float)
 
     expr.define(
@@ -137,6 +138,12 @@ def test_expression():
     assert num.parse("12") == 12
     assert expr.parse("12") == 12
     assert expr.parse("12 +8/2") == 16
+    assert expr.parse("12 - 8*2/2") == 4
+    assert expr.parse("12*2 - 1/2") == 23.5
+
+    assert iserr(expr.parse("12 +8//2"))
+    assert iserr(expr.parse("1 2 +8/2"))
+    assert iserr(expr.parse("1 *+ 2 + 8/2"))
 
 
 
