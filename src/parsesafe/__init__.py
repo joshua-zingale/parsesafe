@@ -2,8 +2,11 @@
 
 from .combinators import (
     Combinator,
+    build,
     regex,
+    regex_groups,
     string,
+    combinator,
 )
 
 from .err import (
@@ -12,7 +15,10 @@ from .err import (
 
 __all__ = [
     "Combinator",
+    "build",
+    "combinator",
     "regex",
+    "regex_groups",
     "string",
 
     "iserr"
